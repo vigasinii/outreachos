@@ -118,7 +118,7 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS chat_history (
                 id SERIAL PRIMARY KEY,
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                session_id TEXT REFERENCES chat_sessions(id) ON DELETE CASCADE,
+                session_id TEXT,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW()
@@ -144,16 +144,16 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_history(user_id);
             CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_history(session_id);
         """)
-        # Add connection_date column if it doesn't exist (migration)
-        try:
-            await conn.execute("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS connection_date TIMESTAMPTZ")
-        except:
-            pass
-        # Add session_id to chat_history if missing (migration)
-        try:
-            await conn.execute("ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS session_id TEXT REFERENCES chat_sessions(id) ON DELETE CASCADE")
-        except:
-            pass
+        # Migrations for existing databases
+        migrations = [
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS connection_date TIMESTAMPTZ",
+            "ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS session_id TEXT",
+        ]
+        for m in migrations:
+            try:
+                await conn.execute(m)
+            except Exception as e:
+                print(f"Migration note: {e}")
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 def hash_password(password: str) -> str:
