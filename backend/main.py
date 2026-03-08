@@ -589,44 +589,67 @@ async def get_history(cid: str, user=Depends(get_current_user)):
         )
     return [dict(r) for r in rows]
 
-# ─── LINKEDIN SCRAPE (AI-powered extraction) ───────────────────────────────────
-@app.post("/linkedin/extract")
-async def extract_linkedin(body: LinkedInScrapeRequest, user=Depends(get_current_user)):
-    """Use Groq to extract structured contact info from a LinkedIn URL pattern + ask user to paste profile text."""
+# ─── LINKEDIN MODELS ───────────────────────────────────────────────────────────
+class LinkedInParseRequest(BaseModel):
+    profile_text: str
+
+# ─── LINKEDIN PARSE (paste profile text → Groq extracts fields) ────────────────
+@app.post("/linkedin/parse")
+async def parse_linkedin_profile(body: LinkedInParseRequest, user=Depends(get_current_user)):
+    """Parse pasted LinkedIn profile text using Groq to extract structured contact info."""
     client = await get_groq_client(user["id"])
-    url = body.linkedin_url.strip()
+    text = body.profile_text.strip()[:4000]  # Limit to 4000 chars
 
-    # Parse the username from the URL
-    match = re.search(r'linkedin\.com/in/([^/?#]+)', url)
-    li_username = match.group(1).replace("-", " ").title() if match else ""
+    system = """You are a LinkedIn profile parser. Extract structured contact information from raw LinkedIn profile text that a user has copied and pasted.
+Return ONLY a valid JSON object with these exact fields:
+- first_name (string or null)
+- last_name (string or null)  
+- role (their current job title, string or null)
+- company (their current company, string or null)
+- email (if visible, string or null)
+- linkedin_url (if visible in the text, string or null)
+- location (city/country, string or null)
 
-    system = """You are a LinkedIn profile parser. Given a LinkedIn profile URL or username, extract likely contact information.
-Return ONLY a JSON object with these fields: first_name, last_name, company, role, linkedin_url.
-Make educated guesses from the username pattern. Return null for fields you cannot determine."""
+Rules:
+- Extract the CURRENT role and company (most recent position)
+- Do not include any explanation, markdown, or text outside the JSON
+- If a field is not found, use null"""
 
-    prompt = f"""LinkedIn URL: {url}
-Username hint: {li_username}
+    prompt = f"""Extract contact info from this LinkedIn profile text:
 
-Return ONLY valid JSON like:
-{{"first_name": "John", "last_name": "Doe", "company": null, "role": null, "linkedin_url": "{url}"}}"""
+{text}
+
+Return ONLY the JSON object."""
 
     try:
         response = client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-            max_tokens=256,
+            max_tokens=300,
             temperature=0.1,
         )
         raw = response.choices[0].message.content.strip()
-        # Extract JSON from response
         json_match = re.search(r'\{.*\}', raw, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())
-            data["linkedin_url"] = url
             return {"success": True, "data": data}
-        return {"success": False, "error": "Could not parse profile"}
+        return {"success": False, "error": "Could not parse profile text"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.post("/linkedin/extract")
+async def extract_linkedin(body: LinkedInScrapeRequest, user=Depends(get_current_user)):
+    """Fallback: extract name from LinkedIn URL slug."""
+    client = await get_groq_client(user["id"])
+    url = body.linkedin_url.strip()
+    match = re.search(r'linkedin\.com/in/([^/?#]+)', url)
+    li_username = match.group(1).replace("-", " ").title() if match else ""
+    parts = li_username.split()
+    return {"success": True, "data": {
+        "first_name": parts[0] if parts else None,
+        "last_name": " ".join(parts[1:]) if len(parts) > 1 else None,
+        "company": None, "role": None, "linkedin_url": url
+    }}
 
 # ─── DASHBOARD ─────────────────────────────────────────────────────────────────
 @app.get("/dashboard/today")
