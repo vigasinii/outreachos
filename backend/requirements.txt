@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+groq
+pydantic[email]
+asyncpg
+bcrypt
+pyjwt
+python-multipart
