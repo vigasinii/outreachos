@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: outreachos
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: outreachos-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_URL
+        value: https://your-app-name.onrender.com  # update this
+      # Optional: set these for email verification
+      # - key: SMTP_HOST
+      #   value: smtp.gmail.com
+      # - key: SMTP_PORT
+      #   value: "587"
+      # - key: SMTP_USER
+      #   value: your@gmail.com
+      # - key: SMTP_PASS
+      #   value: your-app-password
+
+databases:
+  - name: outreachos-db
+    databaseName: outreachos
+    user: outreachos
+    plan: free
