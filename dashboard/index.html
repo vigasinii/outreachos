@@ -1117,7 +1117,8 @@ function openAdd(){
   document.getElementById('fChan').value='linkedin';
   document.getElementById('fConnDate').value='';
   document.getElementById('addTitle').textContent='ADD CONTACT';
-  document.getElementById('liExtractBtn').disabled=true;
+  document.getElementById('liPasteTxt').value='';
+  document.getElementById('liPasteBox').style.display='none';
   populateCatDropdowns();
   document.getElementById('addModal').classList.add('open');
 }
@@ -1137,7 +1138,7 @@ function openEdit(id){
     try{ document.getElementById('fConnDate').value=new Date(c.connection_date).toISOString().split('T')[0]; }catch{}
   } else { document.getElementById('fConnDate').value=''; }
   document.getElementById('addTitle').textContent='EDIT CONTACT';
-  document.getElementById('liExtractBtn').disabled=!c.linkedin_url;
+
   populateCatDropdowns();
   document.getElementById('fCat').value=c.category_id||'';
   loadSubcats();
