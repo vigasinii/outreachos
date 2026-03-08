@@ -142,12 +142,12 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id);
             CREATE INDEX IF NOT EXISTS idx_contacts_stage ON contacts(stage);
             CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_history(user_id);
-            CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_history(session_id);
         """)
         # Migrations for existing databases
         migrations = [
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS connection_date TIMESTAMPTZ",
             "ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS session_id TEXT",
+            "CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_history(session_id)",
         ]
         for m in migrations:
             try:
