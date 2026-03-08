@@ -531,6 +531,19 @@ td{padding:11px 13px;vertical-align:middle;}
     <div class="mhdr"><div class="mtitle" id="addTitle">ADD CONTACT</div><button class="mclose" onclick="closeAdd()">✕</button></div>
     <div class="mbody">
       <input type="hidden" id="editId"/>
+
+      <!-- LinkedIn paste parser -->
+      <div class="fgrp">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="flbl" style="margin-bottom:0">paste linkedin profile <span class="li-badge">✦ ai autofill</span></label>
+          <button class="abtn abtn-ghost" style="font-size:10px;padding:2px 8px" onclick="togglePasteBox()">show / hide</button>
+        </div>
+        <div id="liPasteBox" style="display:none">
+          <textarea class="ftxt" id="liPasteTxt" placeholder="Go to their LinkedIn profile → Ctrl+A → Ctrl+C → paste here. Groq will extract name, role, company automatically." style="min-height:90px;font-size:12px"></textarea>
+          <button class="li-scrape-btn" id="liParseBtn" onclick="parseLinkedInText()" style="width:100%;margin-top:6px">✦ Parse Profile & Autofill</button>
+        </div>
+      </div>
+
       <div class="frow">
         <div class="fgrp"><label class="flbl">first name *</label><input class="fin" id="fFirst" placeholder="Prasad"/></div>
         <div class="fgrp"><label class="flbl">last name *</label><input class="fin" id="fLast" placeholder="Iyer"/></div>
@@ -540,11 +553,8 @@ td{padding:11px 13px;vertical-align:middle;}
         <div class="fgrp"><label class="flbl">role</label><input class="fin" id="fRole" placeholder="VP Strategy"/></div>
       </div>
       <div class="fgrp">
-        <label class="flbl">linkedin url <span class="li-badge">auto-extract</span></label>
-        <div class="li-scrape-row">
-          <input class="fin" id="fLi" placeholder="linkedin.com/in/username" style="flex:1" oninput="checkLiExtract()"/>
-          <button class="li-scrape-btn" id="liExtractBtn" onclick="extractLinkedIn()" disabled>✦ Extract Info</button>
-        </div>
+        <label class="flbl">linkedin url</label>
+        <input class="fin" id="fLi" placeholder="linkedin.com/in/username" style="width:100%"/>
       </div>
       <div class="frow">
         <div class="fgrp"><label class="flbl">channel</label>
@@ -1396,31 +1406,36 @@ async function sendChat(){
 
 function sendPreset(msg){ document.getElementById('chatInp').value=msg; sendChat(); }
 
-// ── LINKEDIN EXTRACTOR ────────────────────────────────────────────────────────
-function checkLiExtract(){
-  const val=document.getElementById('fLi').value.trim();
-  document.getElementById('liExtractBtn').disabled=!val.includes('linkedin.com/in/');
+// ── LINKEDIN PASTE PARSER ────────────────────────────────────────────────────
+function togglePasteBox(){
+  const box = document.getElementById('liPasteBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
 }
 
-async function extractLinkedIn(){
-  const url=document.getElementById('fLi').value.trim();
-  if(!url) return;
-  const btn=document.getElementById('liExtractBtn');
-  btn.disabled=true; btn.textContent='✦ Extracting...';
+async function parseLinkedInText(){
+  const txt = document.getElementById('liPasteTxt').value.trim();
+  if(!txt){ toast('Paste some profile text first'); return; }
+  const btn = document.getElementById('liParseBtn');
+  btn.disabled = true; btn.textContent = '✦ Parsing with Groq...';
   try{
-    const data=await api('/linkedin/extract','POST',{linkedin_url:url});
+    const data = await api('/linkedin/parse','POST',{profile_text: txt});
     if(data.success && data.data){
-      const d=data.data;
-      if(d.first_name) document.getElementById('fFirst').value=d.first_name;
-      if(d.last_name) document.getElementById('fLast').value=d.last_name;
-      if(d.company) document.getElementById('fCo').value=d.company;
-      if(d.role) document.getElementById('fRole').value=d.role;
-      toast('✓ Profile info extracted!');
+      const d = data.data;
+      if(d.first_name) document.getElementById('fFirst').value = d.first_name;
+      if(d.last_name)  document.getElementById('fLast').value  = d.last_name;
+      if(d.company)    document.getElementById('fCo').value    = d.company;
+      if(d.role)       document.getElementById('fRole').value  = d.role;
+      if(d.email)      { const el=document.getElementById('fEmail'); if(el) el.value=d.email; }
+      if(d.linkedin_url) document.getElementById('fLi').value  = d.linkedin_url;
+      // Collapse the paste box after success
+      document.getElementById('liPasteBox').style.display = 'none';
+      document.getElementById('liPasteTxt').value = '';
+      toast('✓ Profile parsed! Review and save.');
     } else {
-      toast('Could not extract info — fill in manually');
+      toast('Could not parse — try selecting more text from the profile');
     }
-  }catch(e){ toast('Extract failed: '+e.message); }
-  finally{ btn.disabled=false; btn.textContent='✦ Extract Info'; checkLiExtract(); }
+  }catch(e){ toast('Parse failed: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='✦ Parse Profile & Autofill'; }
 }
 
 // ── FILTERS ───────────────────────────────────────────────────────────────────
